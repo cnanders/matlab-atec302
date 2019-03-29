@@ -74,9 +74,11 @@ classdef ATEC302 < handle
             end
         end
         
-        % Write a new setpoint to the hardware
+        % Write a new setpoint to the hardware.  This is reverred to as the
+        % Set Value (SV) in the manual, so this class follows that
+        % nomenclature
         % @param {double 1x1} dValC - degrees C
-        function setTemperature(this, dValC)
+        function setSetValue(this, dValC)
             
             % multiply the value by 10 and convert to 16-bit int
             u16Val = uint16(dValC * 10);
