@@ -42,6 +42,7 @@ classdef ATEC302 < handle
         
     end
     
+    
     methods
         
         function this = ATEC302(varargin)
@@ -59,6 +60,11 @@ classdef ATEC302 < handle
             
             
         end
+        
+        function delete(this)
+            this.comm = [];
+        end
+        
         
         function init(this)
             
@@ -111,42 +117,47 @@ classdef ATEC302 < handle
             u16Val = uint16(dValC * 10);
             
             % convert to hex (force 4 characters)
-            cxVal = dec2hex(u16Val);
+            cxVal = dec2hex(u16Val, 4);
             
             % reshape into a {2x2 char array}
-            cxVal = reshape(cxVal, 2, 2);
+            % cxVal = reshape(cxVal, 2, 2);
             
             % crate 8x2 char array of 8 hex bytes (64-bit)
             cxId = '01';
             cxFcn = '06';
             cxAddr = ['00'; '00'];
-            cxCrc = ['cc'; 'cc'];
-            cCmd = [cxId; cxFcn; cxAddr; cxVal; cxCrc];
             
-            this.write(hex2dec(cCmd));
+            cCmd = [cxId; cxFcn; cxAddr; cxVal(1:2); cxVal(3:4)];
+                        
+            % Careful here - hex2dec returns type double
+            % need to cast as uint8 befor sending to write
+            u8Msg = hex2dec(cCmd); % {double 6 x 1}
+            u8Msg = this.append_crc(u8Msg); %{double 8 x 1}
+            
+            this.write(uint8(u8Msg));
             
         end
         
         % Returns the setpoint in cegrees C
         % @param {double 1x1} dValC - degrees C
-        function getSetValue(this)
-            
-            
-            
+        function d = getSetValue(this)
+                        
             % crate 8x2 char array of 8 hex bytes (64-bit)
 
             cxId = '01';
             cxFcn = '03';
             cxAddr = ['10'; '01'];
             cxCount = ['00'; '01'];
-            cxCrc = ['cc'; 'cc'];
+            % cxCrc = ['cc'; 'cc'];
             
             cCmd = [cxId; cxFcn; cxAddr; cxCount];
             
-            u8Msg = hex2dec(cCmd); % {uint8 6 x 1}
-            u8Msg = this.append_crc(u8Msg); %{uint8 8 x 1}
+            % Careful here - hex2dec returns type double
+            % need to cast as uint8 befor sending to write
+            u8Msg = hex2dec(cCmd); % {double 6 x 1}
+            u8Msg = this.append_crc(u8Msg); %{double 8 x 1}
             
-            this.write(u8Msg);
+            this.write(uint8(u8Msg));
             
             this.waitForBytesAvailable(8);
             
@@ -161,7 +172,7 @@ classdef ATEC302 < handle
             cxData = dec2hex(u8Data,2);
             
             % combine into a single 2-byte hex value, e.g., x011F 
-            cxData = reshape(cxData, 1, 4);
+            cxData = reshape(cxData', 1, 4);
             
             % convert to decimal
             % and divide by 10 since hardware returns a 0.1C resolution value
@@ -179,14 +190,14 @@ classdef ATEC302 < handle
             cxFcn = '03';
             cxAddr = ['10'; '00'];
             cxCount = ['00'; '01'];
-            cxCrc = ['cc'; 'cc'];
+            % cxCrc = ['cc'; 'cc'];
             
             cCmd = [cxId; cxFcn; cxAddr; cxCount];
             
             u8Msg = hex2dec(cCmd); % {uint8 6 x 1}
             u8Msg = this.append_crc(u8Msg); %{uint8 8 x 1}
             
-            this.write(u8Msg);
+            this.write(uint8(u8Msg));
             
             this.waitForBytesAvailable(8);
             
@@ -201,7 +212,7 @@ classdef ATEC302 < handle
             cxData = dec2hex(u8Data,2);
             
             % combine into a single 2-byte hex value, e.g., x011F 
-            cxData = reshape(cxData, 1, 4);
+            cxData = reshape(cxData', 1, 4);
             
             % convert to decimal
             % and divide by 10 since hardware returns a 0.1C resolution value
@@ -216,8 +227,16 @@ classdef ATEC302 < handle
         % {uint8 m x 1} list of bytes in decimal including terminator
         function write(this, u8Data)
             
-            fprintf('atec.atec302.write()');
-            u8Data
+            if ~isa(u8Data, 'uint8')
+                error('u8Data must be uint8 data type');
+            end
+            
+            % Add terminator
+            % u8Data = [u8Data; 10; 13];
+            
+            % Echo each byte in HEX
+            % fprintf('atec.atec302.write() hex bytes:');
+            % dec2hex(double(u8Data))
             
             switch this.cConnection
                 case {this.cCONNECTION_SERIAL, this.cCONNECTION_TCPIP}
