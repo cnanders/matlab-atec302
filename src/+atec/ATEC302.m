@@ -40,6 +40,10 @@ classdef ATEC302 < handle
         % {logical 1x1} true when waiting for a response. 
         lIsBusy = false
         
+        % {double 1x1} storage of the last successfully read value
+        dSetValue = 10;
+        % {double 1x1} storage of the last successfully read temp
+        dTemperature = 15;
     end
     
     
@@ -159,25 +163,30 @@ classdef ATEC302 < handle
             
             this.write(uint8(u8Msg));
             
-            this.waitForBytesAvailable(8);
+            if this.waitForBytesAvailable(8)
             
-            % {uint8 mx1} read returns {uint8 8x1} 8-byte response
-            u8Response = read(this.comm, 8);
+                % {uint8 mx1} read returns {uint8 8x1} 8-byte response
+                u8Response = read(this.comm, 8);
+
+                % Bytes 5 and 6 of the response contain the temperature data
+                u8Data = u8Response(5:6);
+
+                % Convert each 1-byte int to hex representation
+                % (force two hex characters for each)
+                cxData = dec2hex(u8Data, 2);
+
+                % combine into a single 2-byte hex value, e.g., x011F 
+                cxData = reshape(cxData', 1, 4);
+
+                % convert to decimal
+                % and divide by 10 since hardware returns a 0.1C resolution value
+                % multiplied by 10
+                d = hex2dec(cxData) / 10;
+            else
+                fprintf('atec.ATEC302.getSetValue() returning last successfully read value since this request took too long');
+                d = this.dSetValue;
+            end
             
-            % Bytes 5 and 6 of the response contain the temperature data
-            u8Data = u8Response(5:6);
-            
-            % Convert each 1-byte int to hex representation
-            % (force two hex characters for each)
-            cxData = dec2hex(u8Data, 2);
-            
-            % combine into a single 2-byte hex value, e.g., x011F 
-            cxData = reshape(cxData', 1, 4);
-            
-            % convert to decimal
-            % and divide by 10 since hardware returns a 0.1C resolution value
-            % multiplied by 10
-            d = hex2dec(cxData) / 10;
             
         end
         
@@ -199,25 +208,30 @@ classdef ATEC302 < handle
             
             this.write(uint8(u8Msg));
             
-            this.waitForBytesAvailable(8);
+            if this.waitForBytesAvailable(8)
             
-            % {uint8 mx1} read returns {uint8 8x1} 8-byte response
-            u8Response = read(this.comm, 8);
-            
-            % Bytes 5 and 6 of the response contain the temperature data
-            u8Data = u8Response(5:6);
-            
-            % Convert each 1-byte int to hex representation
-            % (force two hex characters for each)
-            cxData = dec2hex(u8Data,2);
-            
-            % combine into a single 2-byte hex value, e.g., x011F 
-            cxData = reshape(cxData', 1, 4);
-            
-            % convert to decimal
-            % and divide by 10 since hardware returns a 0.1C resolution value
-            % multiplied by 10
-            d = hex2dec(cxData) / 10;
+                % {uint8 mx1} read returns {uint8 8x1} 8-byte response
+                u8Response = read(this.comm, 8);
+
+                % Bytes 5 and 6 of the response contain the temperature data
+                u8Data = u8Response(5:6);
+
+                % Convert each 1-byte int to hex representation
+                % (force two hex characters for each)
+                cxData = dec2hex(u8Data,2);
+
+                % combine into a single 2-byte hex value, e.g., x011F 
+                cxData = reshape(cxData', 1, 4);
+
+                % convert to decimal
+                % and divide by 10 since hardware returns a 0.1C resolution value
+                % multiplied by 10
+                d = hex2dec(cxData) / 10;
+                
+            else
+                fprintf('atec.ATEC302.getTemperature() returning last successfully read value since this request took too long');
+                d = this.dTemperature;
+            end
         end
         
         
