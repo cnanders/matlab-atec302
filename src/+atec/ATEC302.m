@@ -162,14 +162,14 @@ classdef ATEC302 < handle
             this.waitForBytesAvailable(8);
             
             % {uint8 mx1} read returns {uint8 8x1} 8-byte response
-            u8Response = read(this.comm, this.comm.BytesAvailable);
+            u8Response = read(this.comm, 8);
             
             % Bytes 5 and 6 of the response contain the temperature data
             u8Data = u8Response(5:6);
             
             % Convert each 1-byte int to hex representation
             % (force two hex characters for each)
-            cxData = dec2hex(u8Data,2);
+            cxData = dec2hex(u8Data, 2);
             
             % combine into a single 2-byte hex value, e.g., x011F 
             cxData = reshape(cxData', 1, 4);
@@ -202,7 +202,7 @@ classdef ATEC302 < handle
             this.waitForBytesAvailable(8);
             
             % {uint8 mx1} read returns {uint8 8x1} 8-byte response
-            u8Response = read(this.comm, this.comm.BytesAvailable);
+            u8Response = read(this.comm, 8);
             
             % Bytes 5 and 6 of the response contain the temperature data
             u8Data = u8Response(5:6);
