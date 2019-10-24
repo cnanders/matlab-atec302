@@ -182,6 +182,9 @@ classdef ATEC302 < handle
                 % and divide by 10 since hardware returns a 0.1C resolution value
                 % multiplied by 10
                 d = hex2dec(cxData) / 10;
+                
+                % update last good value
+                this.dSetValue = d;
             else
                 fprintf('atec.ATEC302.getSetValue() returning last successfully read value since this request took too long');
                 d = this.dSetValue;
@@ -227,6 +230,9 @@ classdef ATEC302 < handle
                 % and divide by 10 since hardware returns a 0.1C resolution value
                 % multiplied by 10
                 d = hex2dec(cxData) / 10;
+                
+                % update last good value
+                this.dTemperature = d;
                 
             else
                 fprintf('atec.ATEC302.getTemperature() returning last successfully read value since this request took too long');
