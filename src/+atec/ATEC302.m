@@ -44,6 +44,9 @@ classdef ATEC302 < handle
         dSetValue = 10;
         % {double 1x1} storage of the last successfully read temp
         dTemperature = 15;
+        
+        % {char 1x4} storage of the last successfully read enabled state
+        cxEnabledState = '0000' 
     end
     
     
@@ -109,6 +112,114 @@ classdef ATEC302 < handle
                 bytes = read(this.comm, this.comm.BytesAvailable);
             end
             this.lIsBusy = false;
+        end
+        
+        % Returns {logical} true if output is off
+        function lReturn = getIsDisabled(this)
+            lReturn = strcmpi(this.getEnabledState(), '0000');
+        end 
+        % Returns {logical} true if in single
+        % point temp control (SPON)
+        function lReturn = getIsEnabledSPON(this)
+            lReturn = strcmpi(this.getEnabledState(), '0004');
+        end 
+        
+        % Sets ENAB to "off"
+        function disable(this)
+            
+            % convert to hex (force 4 characters)
+            cxVal = '0000';
+            
+            % crate 8x2 char array of 8 hex bytes (64-bit)
+            cxId = '01';
+            cxFcn = '06';
+            cxAddr = ['00'; '02'];
+            
+            cCmd = [cxId; cxFcn; cxAddr; cxVal(1:2); cxVal(3:4)];
+                        
+            % Careful here - hex2dec returns type double
+            % need to cast as uint8 befor sending to write
+            u8Msg = hex2dec(cCmd); % {double 6 x 1}
+            u8Msg = this.append_crc(u8Msg); %{double 8 x 1}
+            
+            this.write(uint8(u8Msg));
+            
+        end
+        
+        % Sets ENAB to single point temp control (SPON)
+        function enableSPON(this)
+            
+            % convert to hex (force 4 characters)
+            cxVal = '0004';
+            
+            % crate 8x2 char array of 8 hex bytes (64-bit)
+            cxId = '01';
+            cxFcn = '06';
+            cxAddr = ['00'; '02'];
+            
+            cCmd = [cxId; cxFcn; cxAddr; cxVal(1:2); cxVal(3:4)];
+                        
+            % Careful here - hex2dec returns type double
+            % need to cast as uint8 befor sending to write
+            u8Msg = hex2dec(cCmd); % {double 6 x 1}
+            u8Msg = this.append_crc(u8Msg); %{double 8 x 1}
+            
+            this.write(uint8(u8Msg));
+            
+        end
+        
+        % Returns four element char array of hex characters [0-9a-f]
+        % with one of the following values based on the enabled state of
+        % the hardware
+        % x0000 / OFF (Turn off output)
+        % x0001 / AT1 (auto-tune at SV)
+        % x0002 / AT2 (auto-tune at 90% of SV )
+        % x0003 / MPWR (Manual set duty cyl)
+        % x0004 / SPON (Single Temp point ctrl)
+        % x0005 / PROG (Run Programmable temp profile)
+        % x0006 / HOLD (Hold Temp during prog profile run )
+        
+        function cxData = getEnabledState(this)
+            
+            % crate 8x2 char array of 8 hex bytes (64-bit)
+
+            cxId = '01';
+            cxFcn = '03'; % read 
+            cxAddr = ['00'; '02']; % 
+            cxCount = ['00'; '01']; % read one data
+            % cxCrc = ['cc'; 'cc'];
+            
+            cCmd = [cxId; cxFcn; cxAddr; cxCount];
+            
+            % Careful here - hex2dec returns type double
+            % need to cast as uint8 befor sending to write
+            u8Msg = hex2dec(cCmd); % {double 6 x 1}
+            u8Msg = this.append_crc(u8Msg); %{double 8 x 1}
+            
+            this.write(uint8(u8Msg));
+            
+            if this.waitForBytesAvailable(8)
+            
+                % {uint8 mx1} read returns {uint8 8x1} 8-byte response
+                u8Response = read(this.comm, 8);
+
+                % Bytes 5 and 6 of the response contain the temperature data
+                u8Data = u8Response(5:6);
+
+                % Convert each 1-byte int to hex representation
+                % (force two hex characters for each)
+                cxData = dec2hex(u8Data, 2);
+
+                % combine into a single 2-byte hex value, e.g., x011F 
+                cxData = reshape(cxData', 1, 4);
+                
+                this.cxEnabledState = cxData;
+
+            else
+                this.msg('getEnabledState() returning last successfully read value');
+                cxData = this.cxEnabledState;
+            end
+            
         end
         
         % Write a new setpoint to the hardware.  This is reverred to as the
@@ -186,7 +297,7 @@ classdef ATEC302 < handle
                 % update last good value
                 this.dSetValue = d;
             else
-                fprintf('atec.ATEC302.getSetValue() returning last successfully read value since this request took too long');
+                this.msg('getSetValue() returning last successfully read value');
                 d = this.dSetValue;
             end
             
@@ -209,8 +320,12 @@ classdef ATEC302 < handle
             u8Msg = hex2dec(cCmd); % {uint8 6 x 1}
             u8Msg = this.append_crc(u8Msg); %{uint8 8 x 1}
             
-            this.write(uint8(u8Msg));
-            
+            try
+                this.write(uint8(u8Msg));
+            catch mE
+                this.msg('getTemperture() caught error when wrapping this.write() call');
+            end
+                            
             if this.waitForBytesAvailable(8)
             
                 % {uint8 mx1} read returns {uint8 8x1} 8-byte response
@@ -235,7 +350,7 @@ classdef ATEC302 < handle
                 this.dTemperature = d;
                 
             else
-                fprintf('atec.ATEC302.getTemperature() returning last successfully read value since this request took too long');
+                this.msg('getTemperature() returning last successfully read value');
                 d = this.dTemperature;
             end
         end
@@ -306,7 +421,8 @@ classdef ATEC302 < handle
         end
         
         function msg(~, cMsg)
-            fprintf('ATEC302 %s\n', cMsg);
+            cTimestamp = datestr(datevec(now), 'yyyymmdd-HHMMSS', 'local');
+            fprintf('%s: ATEC302 %s\n', cTimestamp, cMsg);
         end
         
         function l = hasProp(this, c)
@@ -338,7 +454,7 @@ classdef ATEC302 < handle
                 
                 if this.lShowWaitingForBytes
                     cMsg = sprintf(...
-                        'Waiting ... %1.0f of %1.0f expected bytes are currently available', ...
+                        'waitForBytesAvailable() ... %1.0f of %1.0f expected bytes are currently available', ...
                         this.comm.BytesAvailable, ...
                         dBytesExpected ...
                     );
@@ -347,12 +463,12 @@ classdef ATEC302 < handle
                 
                 if (toc > this.dTimeout)
                     cMsg = sprintf(...
-                        'Error.  Serial took too long (> %1.1f sec) to reach expected %1.0f BytesAvailable %1.0f', ...
+                        'waitForByetesAvailable() timeout (> %1.1f sec) did not reach expected BytesAvailable (%1.0f)', ...
                         this.dTimeout, ...
                         dBytesExpected ...
                     );
                     lSuccess = false;
-                    fprintf(cMsg);
+                    this.msg(cMsg);
                     return
                 end
             end

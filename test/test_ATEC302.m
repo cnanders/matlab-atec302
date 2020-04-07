@@ -49,3 +49,6 @@ comm4 = atec.ATEC302(...
 comm4.init();
 comm4.getSetValue()
 comm4.getTemperature()
+
+
+
