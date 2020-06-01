@@ -118,6 +118,8 @@ classdef ATEC302 < handle
         function lReturn = getIsDisabled(this)
             lReturn = strcmpi(this.getEnabledState(), '0000');
         end 
+        
+        
         % Returns {logical} true if in single
         % point temp control (SPON)
         function lReturn = getIsEnabledSPON(this)
