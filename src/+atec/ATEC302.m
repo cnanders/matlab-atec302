@@ -1,4 +1,4 @@
-classdef ATEC302 < Comm
+classdef ATEC302 < Comm & atec.AbstractATEC302
     
  
     properties (Constant)
