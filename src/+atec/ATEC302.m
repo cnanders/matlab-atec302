@@ -1,45 +1,13 @@
-classdef ATEC302 < handle
+classdef ATEC302 < Comm
     
  
     properties (Constant)
-        
-        
-        cCONNECTION_SERIAL = 'serial'
-        cCONNECTION_TCPIP = 'tcpip'
-        cCONNECTION_TCPCLIENT = 'tcpclient'      
+            
         
     end
     
     properties (SetAccess = private)
-        
-        % tcpclient config
-        % --------------------------------
-        % {char 1xm} tcp/ip host
-        cHost = '192.168.20.36'
-        
-        % {uint16 1x1} tcpip port NPort requires a port of 4001 when in
-        % "TCP server" mode
-        u16Port = uint16(4001)
-        
-        
-        % serial config
-        % --------------------------------
-        u16BaudRate = 9600;
-        cPort = 'COM1'
-        cTerminator = '';
-        
-        cConnection
-        
-        % {double 1x1} - timeout of MATLAB {serial} - amount of time it will
-        % wait for a response before aborting.  
-        dTimeout = 2;
-        lShowWaitingForBytes = false;
-        
-        comm
-        
-        % {logical 1x1} true when waiting for a response. 
-        lIsBusy = false
-        
+                        
         % {double 1x1} storage of the last successfully read value
         dSetValue = 10;
         % {double 1x1} storage of the last successfully read temp
@@ -54,64 +22,16 @@ classdef ATEC302 < handle
         
         function this = ATEC302(varargin)
             
+            % Call superclass Comm constructor
+            this = this@Comm(varargin{:});
             
             this.cConnection = this.cCONNECTION_TCPCLIENT;
-            
-            for k = 1 : 2: length(varargin)
-                this.msg(sprintf('passed in %s', varargin{k}));
-                if this.hasProp( varargin{k})
-                    this.msg(sprintf('settting %s', varargin{k}));
-                    this.(varargin{k}) = varargin{k + 1};
-                end
-            end
-            
+            this.init(); % Comm.init()
             
         end
         
         function delete(this)
             this.comm = [];
-        end
-        
-        
-        function init(this)
-            
-            switch this.cConnection
-                case this.cCONNECTION_SERIAL
-                    try
-                        this.msg('init() creating serial instance');
-                        this.comm = serial(this.cPort);
-                        this.comm.BaudRate = this.u16BaudRate;
-                        this.comm.Terminator = this.cTerminator;
-                        % this.comm.InputBufferSize = this.u16InputBufferSize;
-                        % this.comm.OutputBufferSize = this.u16OutputBufferSize;
-                    catch ME
-                        rethrow(ME)
-                    end
-              case this.cCONNECTION_TCPCLIENT
-                    try
-                       this.msg('init() creating tcpclient instance');
-                       this.comm = tcpclient(this.cHost, this.u16Port);
-                    catch ME
-                        rethrow(ME)
-                    end
-            end
-            
-            this.clearBytesAvailable();
-        end
-        
-        % Reads all available bytes from the input buffer
-        function clearBytesAvailable(this)
-
-            this.lIsBusy = true;
-            while this.comm.BytesAvailable > 0
-                cMsg = sprintf(...
-                    'clearBytesAvailable() clearing %1.0f bytes\n', ...
-                    this.comm.BytesAvailable ...
-                );
-                fprintf(cMsg);
-                bytes = read(this.comm, this.comm.BytesAvailable);
-            end
-            this.lIsBusy = false;
         end
         
         % Returns {logical} true if output is off
@@ -359,32 +279,6 @@ classdef ATEC302 < handle
         
         
         
-        
-        
-        % {uint8 m x 1} list of bytes in decimal including terminator
-        function write(this, u8Data)
-            
-            if ~isa(u8Data, 'uint8')
-                error('u8Data must be uint8 data type');
-            end
-            
-            % Add terminator
-            % u8Data = [u8Data; 10; 13];
-            
-            % Echo each byte in HEX
-            % fprintf('atec.atec302.write() hex bytes:');
-            % dec2hex(double(u8Data))
-            
-            switch this.cConnection
-                case {this.cCONNECTION_SERIAL, this.cCONNECTION_TCPIP}
-                     fwrite(this.comm, u8Data);
-                case this.cCONNECTION_TCPCLIENT
-                    write(this.comm, u8Data);
-                     % write(this.comm, [u8Data; 13]); % 13 is the terminator
-            end
-        end
-        
-        
     end
     
     
@@ -421,63 +315,8 @@ classdef ATEC302 < handle
             amsg(N+2) = highByte;
             
         end
+
         
-        function msg(~, cMsg)
-            cTimestamp = datestr(datevec(now), 'yyyymmdd-HHMMSS', 'local');
-            fprintf('%s: ATEC302 %s\n', cTimestamp, cMsg);
-        end
-        
-        function l = hasProp(this, c)
-            
-            l = false;
-            if ~isempty(findprop(this, c))
-                l = true;
-            end
-            
-        end
-        
-        % Blocks execution until the serial has provided BytesAvailable
-        % @param {int 1x1} the number of bytes to wait for
-        % @return {logical 1x1} returns true if found the expected number
-        % of bytes before the timeout
-        function lSuccess = waitForBytesAvailable(this, dBytesExpected)
-            
-                        
-            if this.lShowWaitingForBytes
-                cMsg = sprintf(...
-                    'waitForBytesAvailable(%1.0f)', ...
-                    dBytesExpected ...
-                );
-                this.msg(cMsg);
-            end
-                  
-            tic
-            while this.comm.BytesAvailable < dBytesExpected
-                
-                if this.lShowWaitingForBytes
-                    cMsg = sprintf(...
-                        'waitForBytesAvailable() ... %1.0f of %1.0f expected bytes are currently available', ...
-                        this.comm.BytesAvailable, ...
-                        dBytesExpected ...
-                    );
-                    this.msg(cMsg);
-                end
-                
-                if (toc > this.dTimeout)
-                    cMsg = sprintf(...
-                        'waitForByetesAvailable() timeout (> %1.1f sec) did not reach expected BytesAvailable (%1.0f)', ...
-                        this.dTimeout, ...
-                        dBytesExpected ...
-                    );
-                    lSuccess = false;
-                    this.msg(cMsg);
-                    return
-                end
-            end
-            
-            lSuccess = true;
-            
-        end
         
     end
     
